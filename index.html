@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2025西城一模27题 - 交互式解题动画</title>
-<!-- p5.js loaded dynamically after auth -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -43,7 +43,6 @@
     25% { transform: translateX(-6px); }
     75% { transform: translateX(6px); }
   }
-  #app.locked { display: none; }
   #app { max-width: 1020px; margin: 0 auto; padding: 12px; }
   h1 { text-align: center; font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px; }
   .problem-text {
@@ -152,12 +151,11 @@
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
   }
-  window._geoUnlock = function() {
+  function unlock() {
     document.getElementById('auth-gate').classList.add('hidden');
-    document.getElementById('app').classList.remove('locked');
-  };
+  }
   // Check localStorage
-  if (localStorage.getItem(KEY) === HASH) { window._geoAuthPassed = true; window._geoUnlock(); }
+  if (localStorage.getItem(KEY) === HASH) { unlock(); }
   // Button + Enter
   document.getElementById('auth-btn').addEventListener('click', tryAuth);
   document.getElementById('auth-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
@@ -166,8 +164,7 @@
     const h = await sha256(pwd);
     if (h === HASH) {
       localStorage.setItem(KEY, HASH);
-      window._geoUnlock();
-      window._geoLoadP5 && window._geoLoadP5();
+      unlock();
     } else {
       const inp = document.getElementById('auth-pwd');
       inp.classList.add('error');
@@ -177,7 +174,7 @@
   }
 })();
 </script>
-<div id="app" class="locked">
+<div id="app">
   <h1>2025 北京西城初三一模 · 第27题</h1>
   <div class="problem-text">
     <b>题目：</b>在 △ABC 中，∠BAC＝90°，AB＝AC，P 为边 BC 上一点，点 B 与点 E 关于直线 AP 对称，
@@ -781,16 +778,6 @@ document.addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();playing?stopPlay():startPlay();}
 });
 
-// Load p5.js after all functions are defined
-window._geoLoadP5 = function() {
-  if (document.getElementById('p5-script')) return;
-  var s = document.createElement('script');
-  s.id = 'p5-script';
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js';
-  document.body.appendChild(s);
-};
-// If auth already passed via localStorage, load p5 now
-if (window._geoAuthPassed) { window._geoLoadP5(); }
 </script>
 </body>
 </html>
