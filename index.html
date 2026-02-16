@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2025西城一模27题 - 交互式解题动画</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5; color: #333; overflow-x: hidden;
+  }
+  /* Password Gate */
+  #auth-gate {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #f0f2f5; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #auth-gate.hidden { display: none; }
+  .auth-box {
+    background: #fff; border-radius: 16px; padding: 40px 36px; text-align: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08); max-width: 360px; width: 90%;
+  }
+  .auth-box h2 { font-size: 18px; color: #1a1a2e; margin-bottom: 8px; }
+  .auth-box p { font-size: 13px; color: #888; margin-bottom: 20px; }
+  .auth-box input {
+    width: 100%; padding: 10px 14px; font-size: 16px; border: 2px solid #e0e0e0;
+    border-radius: 10px; outline: none; text-align: center; letter-spacing: 4px;
+    transition: border-color 0.2s;
+  }
+  .auth-box input:focus { border-color: #4a6cf7; }
+  .auth-box input.error { border-color: #e74c3c; animation: shake 0.3s; }
+  .auth-box button {
+    margin-top: 16px; width: 100%; padding: 10px; font-size: 15px; font-weight: 600;
+    background: #4a6cf7; color: #fff; border: none; border-radius: 10px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .auth-box button:hover { background: #3a5ce5; }
+  .auth-msg { font-size: 12px; color: #e74c3c; margin-top: 10px; min-height: 18px; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+  #app.locked { display: none; }
+  #app { max-width: 1020px; margin: 0 auto; padding: 12px; }
+  h1 { text-align: center; font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px; }
+  .problem-text {
+    background: #fff; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px;
+    font-size: 13.5px; line-height: 1.8; color: #444; border-left: 4px solid #4a6cf7;
+  }
+  #canvas-wrapper {
+    background: #fff; border-radius: 12px; padding: 6px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 10px;
+    display: flex; justify-content: center;
+  }
+  #canvas-wrapper canvas { border-radius: 8px; }
+  .controls {
+    background: #fff; border-radius: 12px; padding: 14px 18px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 10px;
+  }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .slider-row label { font-size: 15px; font-weight: 500; white-space: nowrap; min-width: 90px; }
+  .slider-row input[type="range"] {
+    flex: 1; height: 6px; -webkit-appearance: none;
+    background: #e0e0e0; border-radius: 3px; outline: none;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+    background: #4a6cf7; cursor: pointer; box-shadow: 0 1px 4px rgba(74,108,247,0.4);
+  }
+  .slider-row .val { font-size: 16px; font-weight: 600; color: #4a6cf7; min-width: 42px; text-align: right; }
+  .step-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 10px; }
+  .step-dots .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #ddd;
+    transition: all 0.3s; cursor: pointer;
+  }
+  .step-dots .dot.active { background: #4a6cf7; transform: scale(1.2); }
+  .step-dots .dot.done { background: #a0b4f7; }
+  .progress-bar-wrap { height: 3px; background: #e8ecf4; border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+  .progress-bar-inner { height: 100%; background: #27ae60; border-radius: 2px; transition: width 0.1s linear; width: 0%; }
+  .step-nav { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+  .step-nav button {
+    padding: 7px 18px; font-size: 13px; border: none; border-radius: 8px;
+    cursor: pointer; font-weight: 500; transition: all 0.2s;
+  }
+  .step-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-prev { background: #e8ecf4; color: #555; }
+  .btn-prev:hover:not(:disabled) { background: #d0d6e4; }
+  .btn-next { background: #4a6cf7; color: #fff; }
+  .btn-next:hover:not(:disabled) { background: #3a5ce5; }
+  .btn-play { background: #27ae60; color: #fff; }
+  .btn-play:hover { background: #219a52; }
+  .btn-play.playing { background: #e74c3c; }
+  .btn-play.playing:hover { background: #c0392b; }
+  .btn-reset { background: #f0f0f0; color: #888; font-size: 12px; padding: 7px 12px; }
+  .btn-reset:hover { background: #e0e0e0; }
+  .btn-voice { background: #8e44ad; color: #fff; }
+  .btn-voice:hover { background: #7d3c98; }
+  .btn-voice.off { background: #bbb; color: #fff; }
+  .voice-bar {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 10px; padding: 6px 0;
+    border-top: 1px solid #eee;
+  }
+  .voice-bar label { font-size: 13px; color: #888; }
+  .voice-bar select {
+    padding: 3px 8px; font-size: 12px; border: 1px solid #ddd;
+    border-radius: 5px; background: #fff; color: #555;
+  }
+  .step-indicator { font-size: 13px; color: #888; min-width: 70px; text-align: center; }
+  .speed-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+  .speed-row label { font-size: 13px; color: #888; }
+  .speed-btn {
+    padding: 3px 10px; font-size: 12px; border: 1.5px solid #ddd; border-radius: 6px;
+    background: #fff; color: #666; cursor: pointer; transition: all 0.2s;
+  }
+  .speed-btn.active { border-color: #4a6cf7; color: #4a6cf7; background: #eef1ff; font-weight: 600; }
+  .speed-btn:hover { border-color: #4a6cf7; }
+  .explanation {
+    background: #fafbff; border-radius: 10px; padding: 14px 18px;
+    min-height: 80px; border: 1px solid #e8ecf4;
+  }
+  .explanation .step-title { font-size: 15px; font-weight: 600; color: #4a6cf7; margin-bottom: 6px; }
+  .explanation .step-body { font-size: 13.5px; line-height: 1.9; color: #555; }
+  .formula {
+    display: inline-block; background: #eef1ff; padding: 1px 7px; border-radius: 4px;
+    font-family: "Times New Roman", "STIX Two Math", serif; font-style: italic; color: #3a5ce5; margin: 1px 0;
+  }
+  .data-panel { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .data-item { font-size: 12px; background: #f5f6fa; padding: 2px 8px; border-radius: 5px; color: #666; }
+  .data-item b { color: #4a6cf7; }
+</style>
+</head>
+<body>
+<!-- Password Gate -->
+<div id="auth-gate">
+  <div class="auth-box">
+    <h2>🔐 请输入访问密码</h2>
+    <p>此页面需要密码才能访问</p>
+    <input type="password" id="auth-pwd" placeholder="输入密码" autocomplete="off">
+    <button id="auth-btn">确认</button>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const HASH = 'e3edcff90adbc005a25aedaab38b455e776150fe08f263662f1cb17ad4234e50';
+  const KEY = 'geo_anim_auth';
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+  function unlock() {
+    document.getElementById('auth-gate').classList.add('hidden');
+    document.getElementById('app').classList.remove('locked');
+  }
+  // Check localStorage
+  if (localStorage.getItem(KEY) === HASH) { unlock(); }
+  // Button + Enter
+  document.getElementById('auth-btn').addEventListener('click', tryAuth);
+  document.getElementById('auth-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+  async function tryAuth() {
+    const pwd = document.getElementById('auth-pwd').value;
+    const h = await sha256(pwd);
+    if (h === HASH) {
+      localStorage.setItem(KEY, HASH);
+      unlock();
+    } else {
+      const inp = document.getElementById('auth-pwd');
+      inp.classList.add('error');
+      document.getElementById('auth-msg').textContent = '密码错误，请重试';
+      setTimeout(() => inp.classList.remove('error'), 400);
+    }
+  }
+})();
+</script>
+<div id="app" class="locked">
+  <h1>2025 北京西城初三一模 · 第27题</h1>
+  <div class="problem-text">
+    <b>题目：</b>在 △ABC 中，∠BAC＝90°，AB＝AC，P 为边 BC 上一点，点 B 与点 E 关于直线 AP 对称，
+    过点 B 作 BC 的垂线，交线段 CA 的延长线于点 D，连接 DE 交直线 AP 于 H，连接 BE、CE。设 ∠BAP＝α。<br>
+    <b>(1)</b> 当 0°＜α＜45° 时：① 求 ∠ACE；② 证明 DE＝CE＋2EH。<br>
+    <b>(2)</b> 当 45°＜α＜90° 时，直接写出 EH、DE、CE 之间的数量关系。
+  </div>
+  <div id="canvas-wrapper"></div>
+  <div class="controls">
+    <div class="slider-row">
+      <label>角度 α =</label>
+      <input type="range" id="alphaSlider" min="5" max="85" value="30" step="1">
+      <span class="val" id="alphaVal">30°</span>
+    </div>
+    <div class="step-dots" id="stepDots"></div>
+    <div class="progress-bar-wrap"><div class="progress-bar-inner" id="progressBar"></div></div>
+    <div class="step-nav">
+      <button class="btn-reset" id="btnReset">重置</button>
+      <button class="btn-prev" id="btnPrev">← 上一步</button>
+      <button class="btn-play" id="btnPlay">▶ 自动播放</button>
+      <span class="step-indicator" id="stepText"></span>
+      <button class="btn-next" id="btnNext">下一步 →</button>
+    </div>
+    <div class="voice-bar">
+      <button class="btn-voice" id="btnVoice" style="padding:5px 14px;font-size:12px;border:none;border-radius:6px;cursor:pointer">🔊 语音讲解：开</button>
+      <label>语速：</label>
+      <select id="voiceRate">
+        <option value="0.7">慢</option>
+        <option value="1" selected>正常</option>
+        <option value="1.3">快</option>
+        <option value="1.6">极速</option>
+      </select>
+    </div>
+    <div class="speed-row" id="speedRow" style="display:none">
+      <label>速度：</label>
+      <button class="speed-btn" data-speed="6000">慢</button>
+      <button class="speed-btn active" data-speed="3500">中</button>
+      <button class="speed-btn" data-speed="1800">快</button>
+      <button class="speed-btn" data-speed="900">极速</button>
+    </div>
+    <div class="explanation" id="explanation"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// 几何计算  归一化坐标: A=(0,0) B=(0,1) C=(1,0) D=(-1,0)
+// ============================================================
+function computeGeometry(aDeg) {
+  const a = aDeg * Math.PI / 180;
+  const sa = Math.sin(a), ca = Math.cos(a), k = sa + ca;
+
+  const A = {x:0, y:0}, B = {x:0, y:1}, C = {x:1, y:0}, D = {x:-1, y:0};
+  const P = {x: sa/k, y: ca/k};
+  const E = {x: Math.sin(2*a), y: Math.cos(2*a)};
+  const r = ca - sa;
+  const H = {x: r*sa, y: r*ca};
+  // midpoint of B and E (foot of perp from B to AP)
+  const Mid = {x: E.x/2, y: (E.y+1)/2};
+
+  // M: foot of perp from B to line through B in direction ⊥BE, meeting DE
+  // s = (cosα-sinα)/(cosα+sinα)
+  const sParam = (ca - sa) / (ca + sa);
+  const M = {
+    x: D.x + sParam * (E.x - D.x),
+    y: D.y + sParam * (E.y - D.y)
+  };
+
+  const dist = (p,q) => Math.sqrt((p.x-q.x)**2 + (p.y-q.y)**2);
+  return {
+    A, B, C, D, P, E, H, Mid, M,
+    DE: dist(D,E), EH: dist(E,H), CE: dist(C,E),
+    DH: dist(D,H), DM: dist(D,M), BM: dist(B,M),
+    BE: dist(B,E), MH: dist(M,H), ME: dist(M,E),
+    angleEAC: Math.abs(90 - 2*aDeg),
+    angleACE: aDeg <= 45 ? 45+aDeg : 135-aDeg,
+    alpha: a
+  };
+}
+
+// ============================================================
+// 坐标变换  math→screen  (保角变换，圆→圆)
+// ============================================================
+const SC = 140, OX = 390, OY = 195;
+function toS(p) { return {x: OX + SC*(p.x - p.y), y: OY + SC*(p.x + p.y)}; }
+
+let step = 1, TOTAL = 8;
+let aDeg = 30, geo;
+
+// Auto-play
+let playing = false, playTimer = null, playSpeed = 3500, playElapsed = 0;
+const TICK = 50;
+
+// ============================================================
+// 语音讲解系统（基于预生成的克隆语音音频）
+// ============================================================
+let voiceOn = true;
+let speaking = false;
+let currentAudio = null;
+
+// 预加载 8 段音频
+const AUDIO_FILES = [];
+for (let i = 1; i <= 8; i++) {
+  const a = new Audio(`audio/step${i}.mp3`);
+  a.preload = 'auto';
+  AUDIO_FILES.push(a);
+}
+
+function speak(stepIdx, onEnd) {
+  stopSpeech();
+  if (!voiceOn) { if (onEnd) onEnd(); return; }
+  const audio = AUDIO_FILES[stepIdx];
+  audio.currentTime = 0;
+  audio.playbackRate = parseFloat(document.getElementById('voiceRate').value);
+  currentAudio = audio;
+  speaking = true;
+  audio.onended = () => { speaking = false; currentAudio = null; if (onEnd) onEnd(); };
+  audio.onerror = () => { speaking = false; currentAudio = null; if (onEnd) onEnd(); };
+  audio.play().catch(() => { speaking = false; currentAudio = null; if (onEnd) onEnd(); });
+}
+
+function stopSpeech() {
+  if (currentAudio) { currentAudio.pause(); currentAudio.currentTime = 0; currentAudio = null; }
+  speaking = false;
+}
+
+function speakCurrentStep() { speak(step - 1); }
+
+// Voice-driven auto-play: play audio, then advance
+function voiceAutoNext() {
+  if (!playing) return;
+  speak(step - 1, () => {
+    if (!playing) return;
+    setTimeout(() => {
+      if (!playing) return;
+      if (step < TOTAL) { step++; refreshUI(); voiceAutoNext(); }
+      else { stopPlay(); }
+    }, 600);
+  });
+}
+
+// ============================================================
+// p5.js
+// ============================================================
+function setup() {
+  createCanvas(840, 530).parent('canvas-wrapper');
+  geo = computeGeometry(aDeg);
+  refreshUI();
+}
+
+function draw() {
+  background(255);
+  geo = computeGeometry(aDeg);
+
+  const sA=toS(geo.A), sB=toS(geo.B), sC=toS(geo.C), sD=toS(geo.D);
+  const sP=toS(geo.P), sE=toS(geo.E), sH=toS(geo.H), sMid=toS(geo.Mid);
+  const sM=toS(geo.M);
+  const s = step; // alias
+
+  // Circle radius in screen = SC*√2
+  const cRadius = SC * Math.SQRT2;
+
+  // ===================== 底层：完整图形 =====================
+  // Triangle fill
+  noStroke(); fill(74,108,247,10);
+  triangle(sA.x,sA.y, sB.x,sB.y, sC.x,sC.y);
+
+  // -- helper: dim or bright --
+  const stk = (r,g,b, bright) => stroke(r,g,b, bright ? 240 : 70);
+  const sw  = (bright) => strokeWeight(bright ? 2.8 : 1.6);
+
+  // Triangle sides
+  stk(44,62,122, s===1); sw(s===1);
+  line(sA.x,sA.y, sB.x,sB.y);
+  line(sB.x,sB.y, sC.x,sC.y);
+  line(sA.x,sA.y, sC.x,sC.y);
+  drawRightAngle(sA, sB, sC, 13, '#2c3e7a', s===1?1:0.3);
+  drawTickMark(sA, sB, s===1?0.8:0.25, 1);
+  drawTickMark(sA, sC, s===1?0.8:0.25, 1);
+
+  // AP
+  stk(230,126,34, s===2); sw(s===2);
+  line(sA.x,sA.y, sP.x,sP.y);
+  drawAngleArc(sA, sB, sP, 28, '#e67e22', 'α', s===2?1:0.25);
+
+  // BE dashed
+  stk(231,76,60, s===3); strokeWeight(s===3?1.8:1);
+  drawDashed(sB.x,sB.y, sE.x,sE.y, 6);
+  // AE dashed
+  stk(231,76,60, s===3||s===4); strokeWeight(s===3?1.5:0.9);
+  drawDashed(sA.x,sA.y, sE.x,sE.y, 7);
+
+  // BD
+  stk(142,68,173, s===4); sw(s===4);
+  line(sB.x,sB.y, sD.x,sD.y);
+  // AD dashed extension
+  stk(142,68,173, s===4); strokeWeight(s===4?1.5:0.9);
+  drawDashed(sA.x,sA.y, sD.x,sD.y, 7);
+  drawRightAngle(sB, sD, sC, 11, '#8e44ad', s===4?1:0.25);
+
+  // DE
+  stk(22,160,133, s===5||s===7||s===8); sw(s===5);
+  line(sD.x,sD.y, sE.x,sE.y);
+  // CE
+  stk(192,57,43, s===5||s===6||s===7||s===8); sw(s===5);
+  line(sC.x,sC.y, sE.x,sE.y);
+
+  // ===================== 步骤高亮层 =====================
+
+  // Step 3: symmetry annotations
+  if (s === 3) {
+    drawPerpMark(sMid, sA, sP, sB, 8, '#e74c3c', 1);
+    drawTickMark(sA, sE, 1, 2);
+    drawAngleArc(sA, sE, sP, 20, '#e74c3c', 'α', 1, true);
+  }
+
+  // Step 4: circle through D,B,E,C — also show in step 7
+  if (s === 4 || s === 7) {
+    push();
+    noFill();
+    stroke(100,140,220, s===4 ? 160 : 100);
+    strokeWeight(1.5);
+    drawingContext.setLineDash([6,4]);
+    circle(sA.x, sA.y, cRadius * 2);
+    drawingContext.setLineDash([]);
+    // tick marks AD=AB=AE=AC
+    if (s === 4) {
+      drawTickMark(sA, sD, 0.8, 2);
+      drawTickMark(sA, sB, 0.8, 2);
+      drawTickMark(sA, sE, 0.8, 2);
+      drawTickMark(sA, sC, 0.8, 2);
+    }
+    pop();
+  }
+
+  // Step 6: ∠ACE derivation
+  if (s === 6) {
+    push();
+    stroke('#e74c3c'); strokeWeight(3);
+    line(sA.x,sA.y, sE.x,sE.y);
+    stroke('#2980b9'); strokeWeight(3);
+    line(sA.x,sA.y, sC.x,sC.y);
+    drawAngleArc(sA, sE, sC, 38, '#e74c3c', geo.angleEAC.toFixed(0)+'°', 1);
+    // label
+    noStroke(); fill(0,0,0,180); textSize(12); textAlign(CENTER,CENTER);
+    const mAE = mid(sA,sE), mAC = mid(sA,sC);
+    text('AE=AB=AC', mAE.x-24, mAE.y-10);
+    pop();
+  }
+
+  // Step 7: auxiliary BM⊥BE, highlight BM, BH, M
+  if (s === 7) {
+    push();
+    // BM line
+    stroke(39,174,96,220); strokeWeight(2.5);
+    line(sB.x,sB.y, sM.x,sM.y);
+    // BH line
+    stroke(41,128,185,180); strokeWeight(2);
+    drawDashed(sB.x,sB.y, sH.x,sH.y, 5);
+    // Highlight DM = CE
+    stroke('#c0392b'); strokeWeight(3);
+    line(sD.x,sD.y, sM.x,sM.y);
+    stroke('#c0392b'); strokeWeight(3);
+    line(sC.x,sC.y, sE.x,sE.y);
+    // Highlight ME = 2EH
+    stroke('#e67e22'); strokeWeight(3);
+    line(sM.x,sM.y, sE.x,sE.y);
+    // right angle BM⊥BE at B
+    drawRightAngle(sB, sM, sE, 10, '#27ae60', 1);
+    // Point M
+    drawPt(sM, '#27ae60', 1);
+    drawLabel(sM, 'M', -14, -10, 1);
+    // Labels on segments
+    noStroke(); textSize(12); textAlign(CENTER,CENTER);
+    const mDM = mid(sD,sM); fill(192,57,43,220);
+    text('DM=CE', mDM.x-30, mDM.y-6);
+    const mME = mid(sM,sE); fill(230,126,34,220);
+    text('ME=2EH', mME.x+32, mME.y+10);
+    pop();
+  }
+
+  // Step 8: α>45° case — show M on extension, highlight relationship
+  if (s === 8) {
+    push();
+    // BM line
+    stroke(39,174,96,200); strokeWeight(2);
+    line(sB.x,sB.y, sM.x,sM.y);
+    drawRightAngle(sB, sM, sE, 10, '#27ae60', 0.8);
+    // BH dashed
+    stroke(41,128,185,150); strokeWeight(1.5);
+    drawDashed(sB.x,sB.y, sH.x,sH.y, 5);
+    // M point & label
+    drawPt(sM, '#27ae60', 1);
+    drawLabel(sM, 'M', -14, 10, 1);
+
+    // Highlight DE
+    stroke('#2980b9'); strokeWeight(3.5);
+    line(sD.x,sD.y, sE.x,sE.y);
+    // Highlight EH (2EH part)
+    stroke('#e67e22'); strokeWeight(3);
+    line(sE.x,sE.y, sH.x,sH.y);
+    // Highlight CE
+    stroke('#c0392b'); strokeWeight(3);
+    line(sC.x,sC.y, sE.x,sE.y);
+
+    // Segment labels
+    noStroke(); textSize(13); textAlign(CENTER,CENTER);
+    const mDE = mid(sD,sE); fill(41,128,185,230);
+    text('DE', mDE.x-20, mDE.y);
+    const mEH = mid(sE,sH); fill(230,126,34,230);
+    text('2EH', mEH.x+20, mEH.y-8);
+    const mCE = mid(sC,sE); fill(192,57,43,230);
+    text('CE', mCE.x+18, mCE.y+12);
+
+    // Show the formula prominently
+    fill(0,0,0,200); textSize(15); textAlign(CENTER,CENTER);
+    text('DE ＝ 2EH − CE  ✓', 420, 490);
+    pop();
+  }
+
+  // ===================== 点和标签（始终可见）=====================
+  const bp = 0.35;
+  drawPt(sP, '#e67e22', s===2?1:bp);
+  drawPt(sE, '#e74c3c', s===3||s===6||s===7?1:bp);
+  drawPt(sD, '#8e44ad', s===4?1:bp);
+  drawPt(sH, '#16a085', s===5||s===7||s===8?1:bp);
+  drawPt(sA, '#2c3e7a', s===1?1:bp);
+  drawPt(sB, '#2c3e7a', s===1?1:bp);
+  drawPt(sC, '#2c3e7a', s===1?1:bp);
+
+  drawLabel(sA,'A',-6,-14,1); drawLabel(sB,'B',-18,8,1);
+  drawLabel(sC,'C',10,8,1);   drawLabel(sP,'P',2,14,1);
+  drawLabel(sE,'E',10, aDeg>45?14:-14, 1);
+  drawLabel(sD,'D',-18,-6,1);
+  drawLabel(sH,'H', aDeg>45?-16:10, aDeg>45?-10:-14, 1);
+
+  // ===================== 数值面板 =====================
+  if (s >= 5) {
+    push(); noStroke(); textSize(11.5); textAlign(LEFT,TOP);
+    const u = SC*Math.SQRT2;
+    const de=geo.DE*u, eh=geo.EH*u, ce=geo.CE*u;
+    if (aDeg <= 45) {
+      fill(100,160);
+      text(`DE=${de.toFixed(1)}   CE+2EH=${(ce+2*eh).toFixed(1)}   (α<45°: DE=CE+2EH ✓)`, 16, 508);
+    } else {
+      fill(100,160);
+      text(`DE=${de.toFixed(1)}   2EH−CE=${(2*eh-ce).toFixed(1)}   (α>45°: DE=2EH−CE ✓)`, 16, 508);
+    }
+    pop();
+  }
+}
+
+// ============================================================
+// 绘图工具
+// ============================================================
+function mid(a,b) { return {x:(a.x+b.x)/2, y:(a.y+b.y)/2}; }
+
+function drawPt(p, col, t) {
+  const c = color(col); noStroke();
+  fill(red(c),green(c),blue(c), t*255);
+  circle(p.x, p.y, 6);
+}
+function drawLabel(p, txt, ox, oy, t) {
+  noStroke(); fill(0,0,0, t*220);
+  textSize(14); textStyle(BOLD); textAlign(CENTER,CENTER);
+  text(txt, p.x+ox, p.y+oy); textStyle(NORMAL);
+}
+function drawDashed(x1,y1,x2,y2,d) {
+  const len = dist(x1,y1,x2,y2), n = Math.floor(len/d);
+  for (let i=0; i<n; i+=2) {
+    const t1=i/n, t2=Math.min((i+1)/n,1);
+    line(lerp(x1,x2,t1),lerp(y1,y2,t1),lerp(x1,x2,t2),lerp(y1,y2,t2));
+  }
+}
+function drawRightAngle(v, p1, p2, sz, col, t) {
+  const d1=norm2(p1.x-v.x,p1.y-v.y), d2=norm2(p2.x-v.x,p2.y-v.y);
+  const a={x:v.x+d1.x*sz, y:v.y+d1.y*sz};
+  const b={x:v.x+d2.x*sz, y:v.y+d2.y*sz};
+  const c2={x:a.x+d2.x*sz, y:a.y+d2.y*sz};
+  const cc=color(col); stroke(red(cc),green(cc),blue(cc),t*200);
+  strokeWeight(1.4); noFill();
+  line(a.x,a.y,c2.x,c2.y); line(c2.x,c2.y,b.x,b.y);
+}
+function drawAngleArc(v,p1,p2,r,col,lbl,t,small) {
+  let a1=atan2(p1.y-v.y,p1.x-v.x), a2=atan2(p2.y-v.y,p2.x-v.x);
+  let d=a2-a1; while(d<0)d+=TWO_PI; while(d>TWO_PI)d-=TWO_PI;
+  let st=a1;
+  if(d>PI){let tmp=st;st=a2;d=TWO_PI-d;}
+  const cc=color(col); noFill();
+  stroke(red(cc),green(cc),blue(cc),t*220);
+  strokeWeight(small?1.4:1.8);
+  arc(v.x,v.y,r*2,r*2,st,st+d);
+  const ma=st+d/2, lr=r+(small?12:14);
+  noStroke(); fill(red(cc),green(cc),blue(cc),t*240);
+  textSize(small?11:12); textAlign(CENTER,CENTER);
+  text(lbl, v.x+lr*cos(ma), v.y+lr*sin(ma));
+}
+function drawTickMark(p1,p2,t,count) {
+  count=count||1;
+  const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+  const dx=p2.x-p1.x, dy=p2.y-p1.y, len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1)return;
+  const nx=-dy/len, ny=dx/len, tx=dx/len, ty=dy/len;
+  stroke(0,0,0,t*160); strokeWeight(1.4);
+  for(let i=0;i<count;i++){
+    const off=(i-(count-1)/2)*3;
+    const cx=mx+tx*off, cy=my+ty*off;
+    line(cx-nx*5,cy-ny*5, cx+nx*5,cy+ny*5);
+  }
+}
+function drawPerpMark(M,lp1,lp2,from,sz,col,t) {
+  const dx=lp2.x-lp1.x,dy=lp2.y-lp1.y,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1)return;
+  const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+  const side=(from.x-M.x)*nx+(from.y-M.y)*ny;
+  const sg=side>0?1:-1;
+  const a={x:M.x+ux*sz,y:M.y+uy*sz};
+  const b={x:a.x+sg*nx*sz,y:a.y+sg*ny*sz};
+  const c={x:M.x+sg*nx*sz,y:M.y+sg*ny*sz};
+  const cc=color(col); noFill();
+  stroke(red(cc),green(cc),blue(cc),t*180); strokeWeight(1.2);
+  line(a.x,a.y,b.x,b.y); line(b.x,b.y,c.x,c.y);
+}
+function norm2(x,y){const l=Math.sqrt(x*x+y*y);return l>1e-4?{x:x/l,y:y/l}:{x:0,y:0};}
+
+// ============================================================
+// 标准答案步骤说明
+// ============================================================
+const STEPS = [
+  { title:'第一步：审题 — 等腰直角三角形 ABC',
+    body:`已知 △ABC 中 <span class="formula">∠BAC＝90°，AB＝AC</span>。<br>
+    这是一个等腰直角三角形，顶角在 A，∠ABC＝∠ACB＝45°。` },
+  { title:'第二步：取点 P，设 ∠BAP＝α',
+    body:`P 为边 BC 上一点，连接 AP。设 <span class="formula">∠BAP＝α</span>。<br>
+    则 <span class="formula">∠PAC＝90°−α</span>。<br>拖动滑块改变 α 观察图形变化。` },
+  { title:'第三步：对称 — B 与 E 关于 AP 对称',
+    body:`点 B 与点 E 关于直线 AP 对称，由此得到：<br>
+    • <span class="formula">AE＝AB</span>（A 在对称轴上）<br>
+    • <span class="formula">∠EAP＝∠BAP＝α</span>（对称轴是角平分线）<br>
+    • BE⊥AP，且 AP 平分线段 BE` },
+  { title:'第四步：作 BD⊥BC，四点共圆',
+    body:`过 B 作 BC 的垂线交 CA 延长线于 D。<br>
+    ∵ ∠DBC＝90°，∠BCA＝45° ∴ <span class="formula">∠ADB＝∠ABD＝45°</span><br>
+    ∴ <span class="formula">AD＝AB＝AE＝AC</span>（四条等长线段！）<br>
+    ∴ D、B、E、C 四点共圆，<b>圆心为 A</b>，半径＝AB。` },
+  { title:'第五步：连 DE 交 AP 于 H，连 CE',
+    body:`连接 DE，与直线 AP 交于点 H。连接 CE。<br>
+    接下来分两问求解。` },
+  { title:'第六步：(1)① 求 ∠ACE＝45°＋α',
+    body:`<b>推导：</b><br>
+    ① ∵ 对称性：<span class="formula">∠BAE＝∠BAP＋∠PAE＝α＋α＝2α</span><br>
+    ② ∵ <span class="formula">∠BAC＝90°</span>，∴ <span class="formula">∠CAE＝90°−2α</span><br>
+    ③ ∵ AE＝AB＝AC ∴ △ACE 为等腰三角形<br>
+    ④ <span class="formula">∠ACE＝(180°−(90°−2α))÷2＝<b>45°＋α</b></span>` },
+  { title:'第七步：(1)② 证明 DE＝CE＋2EH',
+    body:`<b>辅助线：</b>过 B 作 <span class="formula">BM⊥BE</span> 交 DE 于 M。<br>
+    ① ∵ D、B、E、C 共圆 ∴ <span class="formula">∠BED＝∠BCD＝45°</span>（同弧上的圆周角）<br>
+    ② ∴ ∠BME＝∠BEM＝45° ∴ <span class="formula">BM＝BE</span><br>
+    ③ ∵ ∠DBM＝∠CBE，BD＝BC ∴ <span class="formula">△BMD≌△BEC（SAS）</span><br>
+    ④ ∴ <span class="formula">DM＝CE</span>（对应边相等）<br>
+    ⑤ ∵ 对称得 BH＝EH ∴ ∠HBE＝∠HEB＝45° ∴ BH⊥ME<br>
+    ⑥ ∴ <span class="formula">EH＝MH</span> ∴ ME＝2EH<br>
+    ⑦ <span class="formula">DE＝DM＋ME＝<b>CE＋2EH</b></span> ✓` },
+  { title:'第八步：(2) 当 45°＜α＜90° 时（α 已自动切换到 60°）',
+    body:`当 α＞45° 时，图形发生了关键变化：<br>
+    • E 移到了 BC 上方（靠近 D 一侧）<br>
+    • H 在 AP 的<b>反向延长线</b>上（不在线段 AP 内）<br>
+    • 辅助点 M 落在 DE 延长线上（D 的另一侧）<br><br>
+    此时 DE＝ME−DM＝2EH−CE，即：<br>
+    <span class="formula" style="font-size:16px"><b>DE＝2EH−CE</b></span><br>
+    <span style="color:#888;font-size:12px">可拖动滑块验证：α 在 (45°, 90°) 范围内该等式始终成立。</span>` }
+];
+
+// ============================================================
+// UI
+// ============================================================
+let prevAlpha = null; // remember α before auto-switch
+function refreshUI() {
+  // Auto-switch α for step 8 (α>45°) and step 7 (α<45°)
+  if (step === 8 && aDeg <= 45) {
+    prevAlpha = aDeg;
+    aDeg = 60;
+    document.getElementById('alphaSlider').value = aDeg;
+    geo = computeGeometry(aDeg);
+  } else if (step === 7 && aDeg > 45 && prevAlpha !== null) {
+    aDeg = prevAlpha;
+    prevAlpha = null;
+    document.getElementById('alphaSlider').value = aDeg;
+    geo = computeGeometry(aDeg);
+  }
+
+  document.getElementById('stepText').textContent = `${step} / ${TOTAL}`;
+  document.getElementById('btnPrev').disabled = step <= 1;
+  document.getElementById('btnNext').disabled = step >= TOTAL;
+  document.getElementById('alphaVal').textContent = aDeg+'°';
+
+  // play btn
+  const pb = document.getElementById('btnPlay');
+  pb.textContent = playing ? '⏸ 暂停' : '▶ 播放';
+  pb.classList.toggle('playing', playing);
+  if (!playing) document.getElementById('progressBar').style.width = '0%';
+
+  // voice btn
+  const vb = document.getElementById('btnVoice');
+  vb.textContent = voiceOn ? '🔊 语音讲解：开' : '🔇 语音讲解：关';
+  vb.classList.toggle('off', !voiceOn);
+
+  // dots
+  const dots = document.getElementById('stepDots'); dots.innerHTML = '';
+  for (let i=1;i<=TOTAL;i++){
+    const d=document.createElement('div');
+    d.className='dot'+(i===step?' active':i<step?' done':'');
+    d.onclick=()=>{stopPlay();step=i;refreshUI();if(voiceOn)speakCurrentStep();};
+    dots.appendChild(d);
+  }
+
+  // explanation
+  const info = STEPS[step-1];
+  let extra = '';
+  if (step >= 5) {
+    const u = SC*Math.SQRT2;
+    const de=geo.DE*u, eh=geo.EH*u, ce=geo.CE*u;
+    const case1 = aDeg <= 45;
+    const verify = case1 ? (ce+2*eh) : (2*eh-ce);
+    const formula = case1 ? 'CE+2EH' : '2EH−CE';
+    extra = `<div class="data-panel">
+      <span class="data-item">α＝<b>${aDeg}°</b> ${case1?'(＜45°)':'(＞45°)'}</span>
+      <span class="data-item">∠ACE＝<b>${geo.angleACE.toFixed(1)}°</b></span>
+      <span class="data-item">DE＝<b>${de.toFixed(1)}</b></span>
+      <span class="data-item">CE＝<b>${ce.toFixed(1)}</b></span>
+      <span class="data-item">EH＝<b>${eh.toFixed(1)}</b></span>
+      <span class="data-item" style="background:${case1?'#e8f5e9':'#fff3e0'}">
+        ${formula}＝<b>${verify.toFixed(1)}</b>＝DE ✓</span>
+    </div>`;
+  }
+  document.getElementById('explanation').innerHTML =
+    `<div class="step-title">${info.title}</div><div class="step-body">${info.body}${extra}</div>`;
+}
+
+// ============================================================
+// Auto-play
+// ============================================================
+function startPlay(){
+  if(playing)return; playing=true; playElapsed=0;
+  if(step>=TOTAL){step=1;}
+  refreshUI();
+  if(voiceOn){
+    // Voice-driven: speech controls pacing
+    voiceAutoNext();
+  } else {
+    // Timer-driven
+    document.getElementById('speedRow').style.display='';
+    playTimer=setInterval(tickPlay,TICK);
+  }
+}
+function stopPlay(){
+  playing=false; playElapsed=0;
+  stopSpeech();
+  if(playTimer){clearInterval(playTimer);playTimer=null;}
+  document.getElementById('speedRow').style.display='none';
+  refreshUI();
+}
+function tickPlay(){
+  playElapsed+=TICK;
+  document.getElementById('progressBar').style.width=(playElapsed/playSpeed*100)+'%';
+  if(playElapsed>=playSpeed){
+    playElapsed=0;
+    if(step<TOTAL){step++;refreshUI();}
+    else{stopPlay();}
+  }
+}
+
+// ============================================================
+// Events
+// ============================================================
+document.getElementById('alphaSlider').addEventListener('input',function(){
+  aDeg=+this.value; geo=computeGeometry(aDeg); refreshUI();
+});
+document.getElementById('btnVoice').addEventListener('click',()=>{
+  voiceOn=!voiceOn;
+  if(!voiceOn) stopSpeech();
+  refreshUI();
+});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();if(step>1){step--;refreshUI();if(voiceOn)speakCurrentStep();}});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();if(step<TOTAL){step++;refreshUI();if(voiceOn)speakCurrentStep();}});
+document.getElementById('btnPlay').addEventListener('click',()=>{playing?stopPlay():startPlay();});
+document.getElementById('btnReset').addEventListener('click',()=>{
+  stopPlay();stopSpeech();step=1;aDeg=30;prevAlpha=null;
+  document.getElementById('alphaSlider').value=30;
+  geo=computeGeometry(30);refreshUI();
+});
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active'); playSpeed=+this.dataset.speed; playElapsed=0;
+  });
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){stopPlay();if(step<TOTAL){step++;refreshUI();if(voiceOn)speakCurrentStep();}}
+  else if(e.key==='ArrowLeft'){stopPlay();if(step>1){step--;refreshUI();if(voiceOn)speakCurrentStep();}}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():startPlay();}
+});
+</script>
+</body>
+</html>
