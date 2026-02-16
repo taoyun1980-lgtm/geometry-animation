@@ -275,25 +275,37 @@ let voiceOn = true;
 let speaking = false;
 let currentAudio = null;
 
-// 预加载 8 段音频
-const AUDIO_FILES = [];
-for (let i = 1; i <= 8; i++) {
-  const a = new Audio(`audio/step${i}.mp3`);
-  a.preload = 'auto';
-  AUDIO_FILES.push(a);
-}
+// 预加载音频（第7步拆成两段避免噪音）
+const AUDIO_MAP = {
+  1: [new Audio('audio/step1.mp3')],
+  2: [new Audio('audio/step2.mp3')],
+  3: [new Audio('audio/step3.mp3')],
+  4: [new Audio('audio/step4.mp3')],
+  5: [new Audio('audio/step5.mp3')],
+  6: [new Audio('audio/step6.mp3')],
+  7: [new Audio('audio/step7a.mp3'), new Audio('audio/step7b.mp3')],
+  8: [new Audio('audio/step8.mp3')]
+};
+Object.values(AUDIO_MAP).flat().forEach(a => a.preload = 'auto');
 
 function speak(stepIdx, onEnd) {
   stopSpeech();
   if (!voiceOn) { if (onEnd) onEnd(); return; }
-  const audio = AUDIO_FILES[stepIdx];
-  audio.currentTime = 0;
-  audio.playbackRate = parseFloat(document.getElementById('voiceRate').value);
-  currentAudio = audio;
-  speaking = true;
-  audio.onended = () => { speaking = false; currentAudio = null; if (onEnd) onEnd(); };
-  audio.onerror = () => { speaking = false; currentAudio = null; if (onEnd) onEnd(); };
-  audio.play().catch(() => { speaking = false; currentAudio = null; if (onEnd) onEnd(); });
+  const clips = AUDIO_MAP[stepIdx + 1];
+  const rate = parseFloat(document.getElementById('voiceRate').value);
+  let i = 0;
+  function playNext() {
+    if (i >= clips.length) { speaking = false; currentAudio = null; if (onEnd) onEnd(); return; }
+    const audio = clips[i++];
+    audio.currentTime = 0;
+    audio.playbackRate = rate;
+    currentAudio = audio;
+    speaking = true;
+    audio.onended = playNext;
+    audio.onerror = () => { speaking = false; currentAudio = null; if (onEnd) onEnd(); };
+    audio.play().catch(() => { speaking = false; currentAudio = null; if (onEnd) onEnd(); });
+  }
+  playNext();
 }
 
 function stopSpeech() {
