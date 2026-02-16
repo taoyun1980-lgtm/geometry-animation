@@ -152,18 +152,12 @@
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
   }
-  function unlock() {
+  window._geoUnlock = function() {
     document.getElementById('auth-gate').classList.add('hidden');
     document.getElementById('app').classList.remove('locked');
-    if (!document.getElementById('p5-script')) {
-      var s = document.createElement('script');
-      s.id = 'p5-script';
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js';
-      document.body.appendChild(s);
-    }
-  }
+  };
   // Check localStorage
-  if (localStorage.getItem(KEY) === HASH) { unlock(); }
+  if (localStorage.getItem(KEY) === HASH) { window._geoAuthPassed = true; window._geoUnlock(); }
   // Button + Enter
   document.getElementById('auth-btn').addEventListener('click', tryAuth);
   document.getElementById('auth-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
@@ -172,7 +166,8 @@
     const h = await sha256(pwd);
     if (h === HASH) {
       localStorage.setItem(KEY, HASH);
-      unlock();
+      window._geoUnlock();
+      window._geoLoadP5 && window._geoLoadP5();
     } else {
       const inp = document.getElementById('auth-pwd');
       inp.classList.add('error');
@@ -785,6 +780,17 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='ArrowLeft'){stopPlay();if(step>1){step--;refreshUI();if(voiceOn)speakCurrentStep();}}
   else if(e.key===' '){e.preventDefault();playing?stopPlay():startPlay();}
 });
+
+// Load p5.js after all functions are defined
+window._geoLoadP5 = function() {
+  if (document.getElementById('p5-script')) return;
+  var s = document.createElement('script');
+  s.id = 'p5-script';
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js';
+  document.body.appendChild(s);
+};
+// If auth already passed via localStorage, load p5 now
+if (window._geoAuthPassed) { window._geoLoadP5(); }
 </script>
 </body>
 </html>
